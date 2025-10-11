@@ -1,0 +1,280 @@
+
+<!-- network_device_monitor/frontend/deployment_guide.html -->
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>网络设备监控系统 - 部署指南</title>
+  <link href="https://cdnjs.cloudflare.com/ajax/libs/tailwindcss/2.2.19/tailwind.min.css" rel="stylesheet">
+  <link href="https://fonts.loli.net/css?family=Noto+Sans+SC:wght@400;500;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <style>
+    body {
+      font-family: 'Noto Sans SC', sans-serif;
+      background: linear-gradient(135deg, #f5f7fa 0%, #e4e8f0 100%);
+      color: #333;
+    }
+    .code-block {
+      background-color: #2d2d2d;
+      color: #f8f8f2;
+      border-radius: 6px;
+      padding: 1rem;
+      font-family: 'Courier New', monospace;
+      overflow-x: auto;
+    }
+    .step-card {
+      background: white;
+      border-left: 4px solid #3b82f6;
+      box-shadow: 0 4px 6px rgba(0, 0, 0, 0.05);
+    }
+    .section-title {
+      position: relative;
+      padding-left: 1.5rem;
+    }
+    .section-title:before {
+      content: '';
+      position: absolute;
+      left: 0;
+      top: 50%;
+      transform: translateY(-50%);
+      width: 6px;
+      height: 6px;
+      background-color: #3b82f6;
+      border-radius: 50%;
+    }
+  </style>
+</head>
+<body>
+  <div class="min-h-screen py-12 px-4 sm:px-6 lg:px-8">
+    <div class="max-w-4xl mx-auto">
+      <div class="text-center mb-12">
+        <h1 class="text-4xl font-bold text-gray-800 mb-4">
+          <i class="fas fa-server mr-3 text-blue-500"></i>网络设备监控系统部署指南
+        </h1>
+        <p class="text-xl text-gray-600">快速搭建您的网络设备监控平台</p>
+      </div>
+
+      <!-- 环境准备 -->
+      <div class="mb-16">
+        <h2 class="text-2xl font-semibold text-gray-800 mb-6 section-title">环境准备</h2>
+        
+        <div class="grid gap-6">
+          <!-- 步骤1 -->
+          <div class="step-card p-6 rounded-lg">
+            <h3 class="text-xl font-medium text-gray-800 mb-3 flex items-center">
+              <span class="w-8 h-8 bg-blue-500 text-white rounded-full flex items-center justify-center mr-3">1</span>
+              系统要求
+            </h3>
+            <div class="text-gray-600 space-y-3">
+              <p><i class="fas fa-check-circle text-green-500 mr-2"></i>操作系统: Linux/Windows/macOS</p>
+              <p><i class="fas fa-check-circle text-green-500 mr-2"></i>Python版本: 3.7+</p>
+              <p><i class="fas fa-check-circle text-green-500 mr-2"></i>Node.js版本: 12+ (仅前端开发需要)</p>
+              <p><i class="fas fa-check-circle text-green-500 mr-2"></i>数据库: SQLite (内置)</p>
+            </div>
+          </div>
+
+          <!-- 步骤2 -->
+          <div class="step-card p-6 rounded-lg">
+            <h3 class="text-xl font-medium text-gray-800 mb-3 flex items-center">
+              <span class="w-8 h-8 bg-blue-500 text-white rounded-full flex items-center justify-center mr-3">2</span>
+              安装依赖
+            </h3>
+            <div class="text-gray-600 mb-4">
+              <p>安装必要的Python依赖包:</p>
+            </div>
+            <div class="code-block mb-4">
+              pip install flask flask-cors paramiko
+            </div>
+            <div class="text-gray-600">
+              <p><i class="fas fa-info-circle text-blue-500 mr-2"></i>建议使用虚拟环境:</p>
+            </div>
+            <div class="code-block">
+              python -m venv venv<br>
+              source venv/bin/activate  # Linux/macOS<br>
+              venv\Scripts\activate     # Windows
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 后端部署 -->
+      <div class="mb-16">
+        <h2 class="text-2xl font-semibold text-gray-800 mb-6 section-title">后端部署</h2>
+        
+        <div class="grid gap-6">
+          <!-- 步骤3 -->
+          <div class="step-card p-6 rounded-lg">
+            <h3 class="text-xl font-medium text-gray-800 mb-3 flex items-center">
+              <span class="w-8 h-8 bg-blue-500 text-white rounded-full flex items-center justify-center mr-3">3</span>
+              数据库初始化
+            </h3>
+            <div class="text-gray-600 mb-4">
+              <p>系统使用SQLite数据库，首次运行会自动创建以下表结构:</p>
+            </div>
+            <div class="code-block">
+              CREATE TABLE IF NOT EXISTS devices (<br>
+              &nbsp;&nbsp;ip TEXT PRIMARY KEY,<br>
+              &nbsp;&nbsp;status TEXT,<br>
+              &nbsp;&nbsp;version TEXT,<br>
+              &nbsp;&nbsp;uptime TEXT,<br>
+              &nbsp;&nbsp;disk_usage REAL,<br>
+              &nbsp;&nbsp;cpu_usage REAL,<br>
+              &nbsp;&nbsp;user TEXT,<br>
+              &nbsp;&nbsp;group_name TEXT,<br>
+              &nbsp;&nbsp;last_check TEXT<br>
+              );<br><br>
+              
+              CREATE TABLE IF NOT EXISTS config (<br>
+              &nbsp;&nbsp;id INTEGER PRIMARY KEY AUTOINCREMENT,<br>
+              &nbsp;&nbsp;auto_refresh_enabled INTEGER,<br>
+              &nbsp;&nbsp;refresh_interval INTEGER,<br>
+              &nbsp;&nbsp;cmd_version TEXT,<br>
+              &nbsp;&nbsp;cmd_uptime TEXT,<br>
+              &nbsp;&nbsp;cmd_disk TEXT,<br>
+              &nbsp;&nbsp;cmd_cpu TEXT,<br>
+              &nbsp;&nbsp;device_groups TEXT<br>
+              );
+            </div>
+          </div>
+
+          <!-- 步骤4 -->
+          <div class="step-card p-6 rounded-lg">
+            <h3 class="text-xl font-medium text-gray-800 mb-3 flex items-center">
+              <span class="w-8 h-8 bg-blue-500 text-white rounded-full flex items-center justify-center mr-3">4</span>
+              启动后端服务
+            </h3>
+            <div class="text-gray-600 mb-4">
+              <p>运行Flask后端服务:</p>
+            </div>
+            <div class="code-block mb-4">
+              python backend/app.py
+            </div>
+            <div class="text-gray-600">
+              <p>默认启动在 <span class="font-mono bg-gray-100 px-2 py-1 rounded">http://localhost:5000</span></p>
+              <p class="mt-2"><i class="fas fa-cog text-blue-500 mr-2"></i>可选配置参数:</p>
+            </div>
+            <div class="code-block">
+              # 修改监听端口<br>
+              app.run(host='0.0.0.0', port=8080)<br><br>
+              
+              # 关闭调试模式(生产环境)<br>
+              app.run(debug=False)
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 前端部署 -->
+      <div class="mb-16">
+        <h2 class="text-2xl font-semibold text-gray-800 mb-6 section-title">前端部署</h2>
+        
+        <div class="grid gap-6">
+          <!-- 步骤5 -->
+          <div class="step-card p-6 rounded-lg">
+            <h3 class="text-xl font-medium text-gray-800 mb-3 flex items-center">
+              <span class="w-8 h-8 bg-blue-500 text-white rounded-full flex items-center justify-center mr-3">5</span>
+              前端配置
+            </h3>
+            <div class="text-gray-600 mb-4">
+              <p>修改API基础URL(如果需要):</p>
+            </div>
+            <div class="code-block mb-4">
+              // 在monitor.js和config.js中修改<br>
+              const API_BASE_URL = 'http://your-server-ip:5000/api';
+            </div>
+            <div class="text-gray-600">
+              <p><i class="fas fa-lightbulb text-yellow-500 mr-2"></i>直接打开index.html即可使用，无需编译</p>
+            </div>
+          </div>
+
+          <!-- 步骤6 -->
+          <div class="step-card p-6 rounded-lg">
+            <h3 class="text-xl font-medium text-gray-800 mb-3 flex items-center">
+              <span class="w-8 h-8 bg-blue-500 text-white rounded-full flex items-center justify-center mr-3">6</span>
+              生产环境部署
+            </h3>
+            <div class="text-gray-600 mb-4">
+              <p>建议使用Nginx部署前端:</p>
+            </div>
+            <div class="code-block mb-4">
+              server {<br>
+              &nbsp;&nbsp;listen 80;<br>
+              &nbsp;&nbsp;server_name your-domain.com;<br>
+              &nbsp;&nbsp;root /path/to/frontend;<br>
+              &nbsp;&nbsp;index index.html;<br>
+              &nbsp;&nbsp;<br>
+              &nbsp;&nbsp;location /api {<br>
+              &nbsp;&nbsp;&nbsp;&nbsp;proxy_pass http://localhost:5000;<br>
+              &nbsp;&nbsp;&nbsp;&nbsp;proxy_set_header Host $host;<br>
+              &nbsp;&nbsp;}<br>
+              }
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 测试指引 -->
+      <div class="mb-16">
+        <h2 class="text-2xl font-semibold text-gray-800 mb-6 section-title">测试指引</h2>
+        
+        <div class="bg-blue-50 border border-blue-200 rounded-lg p-6">
+          <h3 class="text-xl font-medium text-blue-800 mb-4 flex items-center">
+            <i class="fas fa-vial mr-3 text-blue-600"></i>系统功能测试
+          </h3>
+          
+          <div class="space-y-4">
+            <div class="bg-white p-4 rounded-lg shadow-sm">
+              <h4 class="font-medium text-gray-800 mb-2">1. 添加测试设备</h4>
+              <p class="text-gray-600">在监控面板点击"添加设备"按钮，输入测试IP(如192.168.1.1)</p>
+            </div>
+            
+            <div class="bg-white p-4 rounded-lg shadow-sm">
+              <h4 class="font-medium text-gray-800 mb-2">2. 检查设备状态</h4>
+              <p class="text-gray-600">等待约10秒后，系统会自动检查设备状态并更新显示</p>
+            </div>
+            
+            <div class="bg-white p-4 rounded-lg shadow-sm">
+              <h4 class="font-medium text-gray-800 mb-2">3. 配置SSH连接</h4>
+              <p class="text-gray-600">在系统配置页面，为设备分组配置正确的SSH凭据</p>
+            </div>
+            
+            <div class="bg-white p-4 rounded-lg shadow-sm">
+              <h4 class="font-medium text-gray-800 mb-2">4. 验证监控数据</h4>
+              <p class="text-gray-600">确认系统能正确显示设备版本、在线时长、资源使用率等信息</p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 常见问题 -->
+      <div>
+        <h2 class="text-2xl font-semibold text-gray-800 mb-6 section-title">常见问题</h2>
+        
+        <div class="space-y-4">
+          <div class="bg-white p-6 rounded-lg shadow-sm">
+            <h3 class="text-lg font-medium text-gray-800 mb-2">Q: 设备状态一直显示"离线"</h3>
+            <p class="text-gray-600">A: 请检查:</p>
+            <ul class="list-disc pl-5 text-gray-600 space-y-1 mt-2">
+              <li>设备IP是否正确且网络可达</li>
+              <li>SSH端口是否开放(默认22)</li>
+              <li>SSH用户名和密码是否正确</li>
+              <li>防火墙是否阻止了连接</li>
+            </ul>
+          </div>
+          
+          <div class="bg-white p-6 rounded-lg shadow-sm">
+            <h3 class="text-lg font-medium text-gray-800 mb-2">Q: 如何修改自动刷新间隔?</h3>
+            <p class="text-gray-600">A: 在系统配置 → 监控配置中修改"刷新间隔"值(单位:分钟)</p>
+          </div>
+          
+          <div class="bg-white p-6 rounded-lg shadow-sm">
+            <h3 class="text-lg font-medium text-gray-800 mb-2">Q: 数据库文件在哪里?</h3>
+            <p class="text-gray-600">A: 数据库文件为项目根目录下的 <span class="font-mono bg-gray-100 px-2 py-1 rounded">network_monitor.db</span></p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</body>
+</html>

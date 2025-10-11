@@ -1,0 +1,207 @@
+
+/* network_device_monitor/frontend/style.css */
+@import url('https://fonts.loli.net/css?family=Noto+Sans+SC:wght@400;500;700&display=swap');
+
+:root {
+  --primary-gradient: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+  --sidebar-gradient: linear-gradient(180deg, #0f0c29 0%, #302b63 50%, #24243e 100%);
+  --online-gradient: linear-gradient(90deg, rgba(46, 213, 115, 0.2) 0%, rgba(46, 213, 115, 0.1) 100%);
+  --offline-gradient: linear-gradient(90deg, rgba(255, 71, 87, 0.2) 0%, rgba(255, 71, 87, 0.1) 100%);
+  --online-border: #2ed573;
+  --offline-border: #ff4757;
+  --card-bg: rgba(31, 41, 55, 0.8);
+}
+
+body {
+  font-family: 'Noto Sans SC', sans-serif;
+  background: var(--primary-gradient);
+  min-height: 100vh;
+  color: #e6e6e6;
+  margin: 0;
+  padding: 0;
+}
+
+.sidebar {
+  background: var(--sidebar-gradient);
+  box-shadow: 5px 0 15px rgba(0, 0, 0, 0.3);
+}
+
+.status-online {
+  background: var(--online-gradient);
+  border-left: 4px solid var(--online-border);
+}
+
+.status-offline {
+  background: var(--offline-gradient);
+  border-left: 4px solid var(--offline-border);
+}
+
+/* 分组颜色样式 */
+.group-NB2 {
+  background: rgba(59, 130, 246, 0.15);
+}
+
+.group-服务器 {
+  background: rgba(16, 185, 129, 0.15);
+}
+
+.group-网络设备 {
+  background: rgba(139, 92, 246, 0.15);
+}
+
+.group-存储设备 {
+  background: rgba(245, 158, 11, 0.15);
+}
+
+.group-header {
+  background: rgba(255, 255, 255, 0.15);
+  font-weight: 600;
+  border-bottom: 2px solid rgba(255, 255, 255, 0.3);
+  color: #ffffff;
+  font-size: 1.1rem;
+}
+
+.user-input {
+  background-color: rgba(255, 255, 255, 0.2);
+  border-radius: 4px;
+  padding: 2px 8px;
+  font-weight: 500;
+}
+
+.user-input:focus {
+  outline: none;
+  box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.5);
+}
+
+.particles {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  z-index: -1;
+}
+
+.glow-on-hover:hover {
+  box-shadow: 0 0 15px rgba(100, 149, 237, 0.5);
+  transform: translateY(-1px);
+  transition: all 0.3s ease;
+}
+
+.config-card {
+  background: var(--card-bg);
+  backdrop-filter: blur(10px);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.table-container {
+  overflow-x: auto;
+  border-radius: 0.75rem;
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+}
+
+table {
+  min-width: 100%;
+  border-collapse: separate;
+  border-spacing: 0;
+}
+
+th {
+  position: sticky;
+  top: 0;
+  background-color: #1f2937;
+  z-index: 10;
+}
+
+tr {
+  transition: all 0.2s ease;
+}
+
+tr:hover {
+  background-color: rgba(55, 65, 81, 0.5);
+}
+
+.progress-bar {
+  height: 0.5rem;
+  border-radius: 0.25rem;
+  background-color: #374151;
+}
+
+.progress-bar-fill {
+  height: 100%;
+  border-radius: 0.25rem;
+}
+
+.modal-overlay {
+  background-color: rgba(0, 0, 0, 0.5);
+  backdrop-filter: blur(5px);
+}
+
+.input-field {
+  background-color: #1f2937;
+  border: 1px solid #4b5563;
+  transition: all 0.2s ease;
+}
+
+.input-field:focus {
+  outline: none;
+  border-color: #3b82f6;
+  box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.5);
+}
+
+.btn {
+  transition: all 0.2s ease;
+}
+
+.btn-primary {
+  background-color: #3b82f6;
+}
+
+.btn-primary:hover {
+  background-color: #2563eb;
+}
+
+.btn-danger {
+  background-color: #ef4444;
+}
+
+.btn-danger:hover {
+  background-color: #dc2626;
+}
+
+.status-badge {
+  font-size: 0.75rem;
+  font-weight: 600;
+  padding: 0.25rem 0.5rem;
+  border-radius: 9999px;
+}
+
+.status-badge.online {
+  background-color: #dcfce7;
+  color: #166534;
+}
+
+.status-badge.offline {
+  background-color: #fee2e2;
+  color: #991b1b;
+}
+
+@media (max-width: 768px) {
+  .sidebar {
+    width: 100%;
+    height: auto;
+    position: relative;
+  }
+  
+  .main-content {
+    padding: 1rem;
+  }
+  
+  table {
+    font-size: 0.875rem;
+  }
+  
+  th, td {
+    padding: 0.5rem;
+  }
+}

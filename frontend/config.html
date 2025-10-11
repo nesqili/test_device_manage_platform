@@ -1,0 +1,461 @@
+
+<!-- network_device_monitor/frontend/config.html -->
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>系统配置 - 网络设备监控</title>
+  <link href="https://cdnjs.cloudflare.com/ajax/libs/tailwindcss/2.2.19/tailwind.min.css" rel="stylesheet">
+  <link href="https://fonts.loli.net/css?family=Noto+Sans+SC:wght@400;500;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <style>
+    body {
+      font-family: 'Noto Sans SC', sans-serif;
+      background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+      min-height: 100vh;
+      color: #e6e6e6;
+    }
+    .sidebar {
+      background: linear-gradient(180deg, #0f0c29 0%, #302b63 50%, #24243e 100%);
+    }
+    .particles {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      z-index: -1;
+    }
+    .glow-on-hover:hover {
+      box-shadow: 0 0 15px rgba(100, 149, 237, 0.5);
+    }
+    .config-card {
+      background: rgba(31, 41, 55, 0.8);
+      backdrop-filter: blur(10px);
+    }
+    .tab-content {
+      display: none;
+    }
+    .tab-content.active {
+      display: block;
+    }
+    .tab-button {
+      transition: all 0.3s ease;
+    }
+    .tab-button.active {
+      background-color: #3b82f6;
+      color: white;
+    }
+    .test-guide {
+      background: rgba(59, 130, 246, 0.1);
+      border-left: 4px solid #3b82f6;
+    }
+    .save-status {
+      display: inline-flex;
+      align-items: center;
+      margin-left: 8px;
+    }
+    .save-status .spinner {
+      display: none;
+    }
+    .save-status.saving .spinner {
+      display: inline-block;
+    }
+    .save-status.saved {
+      color: #10b981;
+    }
+    .save-status.error {
+      color: #ef4444;
+    }
+    .current-group-badge {
+      background-color: rgba(59, 130, 246, 0.2);
+      border: 1px solid #3b82f6;
+      padding: 0.25rem 0.5rem;
+      border-radius: 0.25rem;
+      font-size: 0.875rem;
+      margin-left: 0.5rem;
+    }
+    .config-section {
+      border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+      padding-bottom: 1.5rem;
+      margin-bottom: 1.5rem;
+    }
+    .config-section:last-child {
+      border-bottom: none;
+    }
+  </style>
+</head>
+<body>
+  <div class="particles" id="particles-js"></div>
+  <div class="flex h-screen">
+    <!-- 侧边栏 -->
+    <div class="sidebar w-64 p-4 shadow-lg">
+      <h1 class="text-2xl font-bold text-center mb-8 text-white">
+        <i class="fas fa-network-wired mr-2"></i>设备监控
+      </h1>
+      <nav>
+        <ul>
+          <li class="mb-2">
+            <a href="index.html" class="block p-3 rounded-lg hover:bg-indigo-600 text-gray-300 transition-all duration-300">
+              <i class="fas fa-tachometer-alt mr-2"></i>监控面板
+            </a>
+          </li>
+          <li class="mb-2">
+            <a href="#" class="block p-3 rounded-lg bg-indigo-700 text-white glow-on-hover transition-all duration-300">
+              <i class="fas fa-cog mr-2"></i>系统配置
+            </a>
+          </li>
+        </ul>
+      </nav>
+      <div class="mt-auto pt-4 border-t border-gray-700">
+        <div class="text-center text-gray-400 text-sm">
+          <p>版本: v1.0.0</p>
+          <p class="mt-2">© 2025 网络监控系统</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- 主内容区 -->
+    <div class="flex-1 overflow-auto p-8">
+      <div class="flex justify-between items-center mb-6">
+        <h2 class="text-2xl font-bold text-white">
+          <i class="fas fa-cogs mr-2"></i>系统配置
+        </h2>
+        <div>
+          <button id="save-config-btn" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg mr-2 transition-all duration-300 glow-on-hover">
+            <i class="fas fa-save mr-2"></i>保存配置
+            <span id="save-status" class="save-status">
+              <span class="spinner"><i class="fas fa-circle-notch fa-spin"></i></span>
+            </span>
+          </button>
+          <button id="reset-config-btn" class="bg-gray-600 hover:bg-gray-700 text-white px-4 py-2 rounded-lg transition-all duration-300 glow-on-hover">
+            <i class="fas fa-undo mr-2"></i>恢复默认
+          </button>
+        </div>
+      </div>
+
+      <!-- 配置选项卡 -->
+      <div class="mb-6">
+        <div class="flex space-x-2">
+          <button class="tab-button px-4 py-2 rounded-lg bg-gray-700 text-gray-300 hover:bg-gray-600 active" data-tab="ssh-config">
+            <i class="fas fa-terminal mr-2"></i>SSH配置
+          </button>
+          <button class="tab-button px-4 py-2 rounded-lg bg-gray-700 text-gray-300 hover:bg-gray-600" data-tab="monitor-config">
+            <i class="fas fa-chart-bar mr-2"></i>监控配置
+          </button>
+          <button class="tab-button px-4 py-2 rounded-lg bg-gray-700 text-gray-300 hover:bg-gray-600" data-tab="group-config">
+            <i class="fas fa-layer-group mr-2"></i>分组管理
+          </button>
+        </div>
+      </div>
+
+      <!-- 配置卡片 -->
+      <div class="grid grid-cols-1 gap-6">
+        <!-- SSH配置 -->
+        <div id="ssh-config" class="tab-content config-card rounded-xl shadow-lg p-6 active">
+          <h3 class="text-xl font-semibold mb-4 text-white border-b border-gray-700 pb-2">
+            <i class="fas fa-terminal mr-2"></i>SSH 连接配置
+            <span id="current-group-badge" class="current-group-badge">NB2</span>
+          </h3>
+          
+          <!-- 分组SSH配置 -->
+          <div class="config-section">
+            <div class="mb-4">
+              <label class="block text-gray-300 text-sm font-medium mb-2" for="ssh-group-select">选择分组</label>
+              <select id="ssh-group-select" class="bg-gray-700 border border-gray-600 rounded-lg px-4 py-2 w-full text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+                <!-- 分组选项将通过JS动态加载 -->
+              </select>
+            </div>
+          </div>
+          
+          <div class="config-section">
+            <h4 class="text-lg font-medium mb-3 text-white">
+              <i class="fas fa-user-shield mr-2"></i>认证配置
+            </h4>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <label class="block text-gray-300 text-sm font-medium mb-2" for="ssh-username">SSH 用户名</label>
+                <input type="text" id="ssh-username" class="bg-gray-700 border border-gray-600 rounded-lg px-4 py-2 w-full text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent" placeholder="root" value="leapfive">
+              </div>
+              <div>
+                <label class="block text-gray-300 text-sm font-medium mb-2" for="ssh-password">SSH 密码</label>
+                <input type="password" id="ssh-password" class="bg-gray-700 border border-gray-600 rounded-lg px-4 py-2 w-full text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent" placeholder="********" value="leapfive">
+              </div>
+              <div>
+                <label class="block text-gray-300 text-sm font-medium mb-2" for="ssh-port">SSH 端口</label>
+                <input type="number" id="ssh-port" class="bg-gray-700 border border-gray-600 rounded-lg px-4 py-2 w-full text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent" placeholder="22" value="22">
+              </div>
+              <div>
+                <label class="block text-gray-300 text-sm font-medium mb-2" for="ssh-timeout">连接超时(秒)</label>
+                <input type="number" id="ssh-timeout" class="bg-gray-700 border border-gray-600 rounded-lg px-4 py-2 w-full text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent" placeholder="5" value="5">
+              </div>
+            </div>
+            
+            <div class="mt-6">
+              <label class="flex items-center space-x-3">
+                <input type="checkbox" id="ssh-key-auth" class="form-checkbox h-5 w-5 text-blue-600 rounded">
+                <span class="text-gray-300">使用SSH密钥认证</span>
+              </label>
+            </div>
+            
+            <div id="ssh-key-fields" class="mt-4 hidden">
+              <div class="mb-4">
+                <label class="block text-gray-300 text-sm font-medium mb-2" for="ssh-key-path">私钥路径</label>
+                <input type="text" id="ssh-key-path" class="bg-gray-700 border border-gray-600 rounded-lg px-4 py-2 w-full text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent" placeholder="例如: ~/.ssh/id_rsa">
+              </div>
+              <div>
+                <label class="block text-gray-300 text-sm font-medium mb-2" for="ssh-key-passphrase">私钥密码(可选)</label>
+                <input type="password" id="ssh-key-passphrase" class="bg-gray-700 border border-gray-600 rounded-lg px-4 py-2 w-full text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent" placeholder="********">
+              </div>
+            </div>
+          </div>
+          
+          <div class="config-section">
+            <h4 class="text-lg font-medium mb-3 text-white">
+              <i class="fas fa-plug mr-2"></i>连接测试
+            </h4>
+            <div class="bg-gray-800 p-4 rounded-lg">
+              <div class="flex items-center mb-2">
+                <input type="text" id="test-ip" class="bg-gray-700 border border-gray-600 rounded-l-lg px-4 py-2 flex-1 text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent" placeholder="输入测试设备IP">
+                <button id="test-connection-btn" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-r-lg transition-all duration-300">
+                  <i class="fas fa-plug mr-1"></i>测试连接
+                </button>
+              </div>
+              <div id="test-result" class="mt-2 hidden">
+                <div class="flex items-center">
+                  <i id="test-icon" class="fas fa-circle-notch fa-spin mr-2"></i>
+                  <span id="test-message">正在测试连接...</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- 监控配置 -->
+        <div id="monitor-config" class="tab-content config-card rounded-xl shadow-lg p-6">
+          <h3 class="text-xl font-semibold mb-4 text-white border-b border-gray-700 pb-2">
+            <i class="fas fa-chart-bar mr-2"></i>监控配置
+          </h3>
+          
+          <!-- 自动刷新配置 -->
+          <div class="mb-6">
+            <h4 class="text-lg font-medium mb-3 text-white">
+              <i class="fas fa-sync-alt mr-2"></i>自动刷新设置
+            </h4>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <label class="flex items-center space-x-3">
+                  <input type="checkbox" id="auto-refresh-toggle" class="form-checkbox h-5 w-5 text-blue-600 rounded">
+                  <span class="text-gray-300">启用自动刷新</span>
+                </label>
+              </div>
+              <div>
+                <label class="block text-gray-300 text-sm font-medium mb-2" for="refresh-interval">刷新间隔(分钟)</label>
+                <input type="number" id="refresh-interval" min="1" max="60" class="bg-gray-700 border border-gray-600 rounded-lg px-4 py-2 w-full text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent" value="5">
+              </div>
+            </div>
+          </div>
+          
+          <!-- 监控命令配置 -->
+          <div>
+            <h4 class="text-lg font-medium mb-3 text-white">
+              <i class="fas fa-code mr-2"></i>监控命令配置
+            </h4>
+            <div class="grid grid-cols-1 gap-4">
+              <div>
+                <label class="block text-gray-300 text-sm font-medium mb-2" for="cmd-version">系统版本命令</label>
+                <input type="text" id="cmd-version" class="bg-gray-700 border border-gray-600 rounded-lg px-4 py-2 w-full text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent" placeholder="例如: cat /etc/os-release" value="sed -n '/^PRETTY_NAME=/{s/^PRETTY_NAME=\\\"\\([^\"]*\\).*/\\1/p;q}' /etc/os-release">
+              </div>
+              <div>
+                <label class="block text-gray-300 text-sm font-medium mb-2" for="cmd-uptime">在线时长命令</label>
+                <input type="text" id="cmd-uptime" class="bg-gray-700 border border-gray-600 rounded-lg px-4 py-2 w-full text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent" placeholder="例如: uptime" value="uptime | perl -pe 's/.*up\\s+(?:(\\d+)\\s+days?,\\s+)?(\\d+):.*/($1?$1:0).\"天$2小时\"/e'">
+              </div>
+              <div>
+                <label class="block text-gray-300 text-sm font-medium mb-2" for="cmd-disk">磁盘占用命令</label>
+                <input type="text" id="cmd-disk" class="bg-gray-700 border border-gray-600 rounded-lg px-4 py-2 w-full text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent" placeholder="例如: df -h / | awk 'NR==2{print $5}'" value="df -h / | awk 'NR==2{print $5}'">
+              </div>
+              <div>
+                <label class="block text-gray-300 text-sm font-medium mb-2" for="cmd-cpu">CPU占用命令</label>
+                <input type="text" id="cmd-cpu" class="bg-gray-700 border border-gray-600 rounded-lg px-4 py-2 w-full text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent" placeholder="例如: top -bn1 | grep 'Cpu(s)' | sed 's/.*, *\\([0-9.]*\\)%* id.*/\\1/' | awk '{print 100 - $1}'" value="top -bn1 | grep 'Cpu(s)' | sed 's/.*, *\\([0-9.]*\\)%* id.*/\\1/' | awk '{print 100 - $1}'">
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- 设备分组管理 -->
+        <div id="group-config" class="tab-content config-card rounded-xl shadow-lg p-6">
+          <h3 class="text-xl font-semibold mb-4 text-white border-b border-gray-700 pb-2">
+            <i class="fas fa-layer-group mr-2"></i>设备分组管理
+          </h3>
+          <div class="mb-4">
+            <div class="flex">
+              <input type="text" id="new-group-name" class="bg-gray-700 border border-gray-600 rounded-l-lg px-4 py-2 flex-1 text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent" placeholder="输入新分组名称">
+              <button id="add-group-btn" class="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-r-lg transition-all duration-300">
+                <i class="fas fa-plus mr-1"></i>添加
+              </button>
+            </div>
+          </div>
+          <div class="bg-gray-800 rounded-lg overflow-hidden">
+            <table class="min-w-full divide-y divide-gray-700">
+              <thead class="bg-gray-700">
+                <tr>
+                  <th class="px-4 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">分组名称</th>
+                  <th class="px-4 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">设备数量</th>
+                  <th class="px-4 py-3 text-right text-xs font-medium text-gray-300 uppercase tracking-wider">操作</th>
+                </tr>
+              </thead>
+              <tbody id="group-table-body" class="bg-gray-800 divide-y divide-gray-700">
+                <!-- 分组数据将通过JS动态加载 -->
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- 部署测试指引 -->
+      <div class="test-guide mt-12 p-6 rounded-xl shadow-lg">
+        <h3 class="text-xl font-semibold mb-4 text-white">
+          <i class="fas fa-vial mr-2"></i>部署测试指引
+        </h3>
+        
+        <div class="space-y-4">
+          <div class="bg-gray-800 p-4 rounded-lg">
+            <h4 class="font-medium text-white mb-2">1. 添加测试设备</h4>
+            <p class="text-gray-300">在监控面板点击"添加设备"按钮，输入测试IP(如192.168.1.1)</p>
+          </div>
+          
+          <div class="bg-gray-800 p-4 rounded-lg">
+            <h4 class="font-medium text-white mb-2">2. 检查设备状态</h4>
+            <p class="text-gray-300">等待约10秒后，系统会自动检查设备状态并更新显示</p>
+          </div>
+          
+          <div class="bg-gray-800 p-4 rounded-lg">
+            <h4 class="font-medium text-white mb-2">3. 配置SSH连接</h4>
+            <p class="text-gray-300">在系统配置页面，为设备分组配置正确的SSH凭据</p>
+          </div>
+          
+          <div class="bg-gray-800 p-4 rounded-lg">
+            <h4 class="font-medium text-white mb-2">4. 验证监控数据</h4>
+            <p class="text-gray-300">确认系统能正确显示设备版本、在线时长、资源使用率等信息</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/particles.js/2.0.0/particles.min.js"></script>
+  <script src="config.js"></script>
+  <script>
+    document.addEventListener('DOMContentLoaded', function() {
+      // 粒子效果初始化
+      particlesJS('particles-js', {
+        particles: {
+          number: { value: 80, density: { enable: true, value_area: 800 } },
+          color: { value: "#3b82f6" },
+          shape: { type: "circle" },
+          opacity: { value: 0.5, random: true },
+          size: { value: 3, random: true },
+          line_linked: { enable: true, distance: 150, color: "#3b82f6", opacity: 0.4, width: 1 },
+          move: { enable: true, speed: 2, direction: "none", random: true, straight: false, out_mode: "out" }
+        },
+        interactivity: {
+          detect_on: "canvas",
+          events: {
+            onhover: { enable: true, mode: "repulse" },
+            onclick: { enable: true, mode: "push" }
+          }
+        }
+      });
+
+      // 选项卡切换
+      const tabButtons = document.querySelectorAll('.tab-button');
+      const tabContents = document.querySelectorAll('.tab-content');
+      
+      tabButtons.forEach(button => {
+        button.addEventListener('click', () => {
+          const tabId = button.dataset.tab;
+          
+          // 更新按钮状态
+          tabButtons.forEach(btn => btn.classList.remove('active'));
+          button.classList.add('active');
+          
+          // 更新内容显示
+          tabContents.forEach(content => content.classList.remove('active'));
+          document.getElementById(tabId).classList.add('active');
+        });
+      });
+
+      // SSH密钥认证切换
+      document.getElementById('ssh-key-auth').addEventListener('change', function() {
+        const keyFields = document.getElementById('ssh-key-fields');
+        if(this.checked) {
+          keyFields.classList.remove('hidden');
+        } else {
+          keyFields.classList.add('hidden');
+        }
+      });
+
+      // 测试连接按钮
+      document.getElementById('test-connection-btn').addEventListener('click', async function() {
+        const ip = document.getElementById('test-ip').value.trim();
+        if(!ip) {
+          alert('请输入测试设备IP');
+          return;
+        }
+
+        const testResult = document.getElementById('test-result');
+        const testIcon = document.getElementById('test-icon');
+        const testMessage = document.getElementById('test-message');
+
+        testResult.classList.remove('hidden');
+        testIcon.className = 'fas fa-circle-notch fa-spin mr-2';
+        testMessage.textContent = '正在测试连接...';
+
+        try {
+          // 获取当前分组SSH配置
+          const groupName = document.getElementById('ssh-group-select').value;
+          const username = document.getElementById('ssh-username').value;
+          const password = document.getElementById('ssh-password').value;
+          const port = document.getElementById('ssh-port').value;
+          const timeout = document.getElementById('ssh-timeout').value;
+          const keyAuth = document.getElementById('ssh-key-auth').checked;
+          const keyPath = document.getElementById('ssh-key-path').value;
+          const keyPassphrase = document.getElementById('ssh-key-passphrase').value;
+
+          // 发送测试请求到后端
+          const response = await fetch('/api/devices/test-connection', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+              ip,
+              groupName,
+              username,
+              password,
+              port,
+              timeout,
+              keyAuth,
+              keyPath,
+              keyPassphrase
+            })
+          });
+
+          const result = await response.json();
+          if(result.success) {
+            testIcon.className = 'fas fa-check-circle text-green-500 mr-2';
+            testMessage.textContent = '连接成功: ' + (result.message || '');
+          } else {
+            testIcon.className = 'fas fa-times-circle text-red-500 mr-2';
+            testMessage.textContent = '连接失败: ' + (result.error || '');
+          }
+        } catch(error) {
+          testIcon.className = 'fas fa-times-circle text-red-500 mr-2';
+          testMessage.textContent = '测试过程中出错: ' + error.message;
+        }
+      });
+    });
+  </script>
+</body>
+</html>
