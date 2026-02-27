@@ -67,7 +67,7 @@ document.addEventListener('DOMContentLoaded', function() {
         if (devices.length === 0) {
             tbody.innerHTML = `
                 <tr>
-                    <td colspan="9" class="text-center py-8 text-gray-400">
+                    <td colspan="10" class="text-center py-8 text-gray-400">
                         <i class="fas fa-server fa-2x mb-2"></i>
                         <p>暂无设备数据</p>
                     </td>
@@ -90,7 +90,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 const groupHeader = document.createElement('tr');
                 groupHeader.className = `group-header group-${deviceGroup.replace(/\s+/g, '-')}`;
                 groupHeader.innerHTML = `
-                    <td colspan="9" class="px-6 py-3 font-semibold text-gray-200">
+                    <td colspan="10" class="px-6 py-3 font-semibold text-gray-200">
                         <i class="fas fa-folder-open mr-2"></i>${deviceGroup}
                     </td>
                 `;
@@ -103,6 +103,9 @@ document.addEventListener('DOMContentLoaded', function() {
             // 确保diskUsage和cpuUsage是数字类型
             const diskUsage = parseFloat(device.disk_usage) || 0;
             const cpuUsage = parseFloat(device.cpu_usage) || 0;
+            
+            // 格式化更新时间
+            const lastCheck = device.last_check ? new Date(device.last_check).toLocaleString() : '-';
             
             tr.innerHTML = `
                 <td class="px-6 py-4 whitespace-nowrap">${device.ip}</td>
@@ -133,6 +136,7 @@ document.addEventListener('DOMContentLoaded', function() {
                         ${getGroupOptions(deviceGroup)}
                     </select>
                 </td>
+                <td class="px-6 py-4 whitespace-nowrap">${lastCheck}</td>
                 <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                     <button class="text-red-400 hover:text-red-600 delete-device-btn" data-ip="${device.ip}"><i class="fas fa-trash-alt"></i></button>
                 </td>
@@ -284,7 +288,7 @@ document.addEventListener('DOMContentLoaded', function() {
         const tbody = document.getElementById('device-table-body');
         const loadingRow = document.createElement('tr');
         loadingRow.innerHTML = `
-            <td colspan="9" class="text-center py-4">
+            <td colspan="10" class="text-center py-4">
                 <div class="inline-flex items-center">
                     <i class="fas fa-circle-notch fa-spin mr-2"></i>
                     正在添加设备 ${ip}...
@@ -301,7 +305,8 @@ document.addEventListener('DOMContentLoaded', function() {
             disk_usage: 0,
             cpu_usage: 0,
             user: '未分配',
-            group_name: group || 'NB2'
+            group_name: group || 'NB2',
+            last_check: new Date().toISOString()
         };
         
         try {
