@@ -1,8 +1,10 @@
-
 // network_device_monitor/frontend/config.js
 document.addEventListener('DOMContentLoaded', function() {
-    // API基础URL - 修改为192.168.1.79:5005
-    const API_BASE_URL = 'http://192.168.1.79:5005/api';
+    // API基础URL - 根据当前访问方式自动判断
+    // 如果是file协议访问，使用默认本地IP；如果是http/https访问，使用相对路径/api
+    const API_BASE_URL = window.location.protocol === 'file:' 
+        ? 'http://127.0.0.1:5005/api' 
+        : '/api';
     
     // 当前选中的分组
     let currentGroup = '';
@@ -56,12 +58,24 @@ document.addEventListener('DOMContentLoaded', function() {
         ];
     }
 
+    function getDefaultConfig() {
+        return {
+            autoRefreshEnabled: true,
+            refreshInterval: 5,
+            cmdVersion: "grep PRETTY_NAME /etc/os-release | cut -d= -f2 | tr -d '\"'",
+            cmdUptime: "uptime | awk -F'up\\s*|,\\s*' '{d=$2;sub(/ days?/,\"\",d);h=$3;sub(/:.*/,\"\",h);print d\" 天 \"h\" 小时\"}'",
+            cmdDisk: "df -h / | awk 'NR==2{print $5}'",
+            cmdCpu: "top -bn1 | grep 'Cpu(s)' | sed 's/.*, *\\([0-9.]*\\)%* id.*/\\1/' | awk '{print 100 - $1}'",
+            deviceGroups: getDefaultGroups()
+        };
+    }
+
     function updateUIConfig(config) {
         // 监控命令
-        document.getElementById('cmd-version').value = config.cmdVersion || 'sed -n \'/^PRETTY_NAME=/{s/^PRETTY_NAME=\\"\\\\([^\\"]*\\\\).*/\\\\1/p;q}\' /etc/os-release';
-        document.getElementById('cmd-uptime').value = config.cmdUptime || 'uptime | perl -pe \'s/.*up\\s+(?:(\\d+)\\s+days?,\\s+)?(\\d+):.*/($1?$1:0)."天$2小时"/e\'';
-        document.getElementById('cmd-disk').value = config.cmdDisk || 'df -h / | awk \'NR==2{print $5}\'';
-        document.getElementById('cmd-cpu').value = config.cmdCpu || 'top -bn1 | grep \'Cpu(s)\' | sed \'s/.*, *\\\\([0-9.]*\\\\)%* id.*/\\\\1/\' | awk \'{print 100 - $1}\'';
+        document.getElementById('cmd-version').value = config.cmdVersion || getDefaultConfig().cmdVersion;
+        document.getElementById('cmd-uptime').value = config.cmdUptime || getDefaultConfig().cmdUptime;
+        document.getElementById('cmd-disk').value = config.cmdDisk || getDefaultConfig().cmdDisk;
+        document.getElementById('cmd-cpu').value = config.cmdCpu || getDefaultConfig().cmdCpu;
         
         // 自动刷新配置
         document.getElementById('auto-refresh-toggle').checked = config.autoRefreshEnabled !== false;
@@ -224,23 +238,49 @@ document.addEventListener('DOMContentLoaded', function() {
     });
 
     // 恢复默认配置
-    document.getElementById('reset-config-btn').addEventListener('click', function() {
+    document.getElementById('reset-config-btn').addEventListener('click', async function() {
         if(confirm('确定要恢复默认配置吗？所有自定义设置将被重置。')) {
-            localStorage.removeItem('networkMonitorConfig');
-            loadConfig();
+            const defaultConfig = getDefaultConfig();
             
-            // 显示重置成功的提示
-            const btn = this;
-            const originalText = btn.innerHTML;
-            btn.innerHTML = '<i class="fas fa-check mr-2"></i>已重置';
-            btn.classList.remove('bg-gray-600', 'hover:bg-gray-700');
-            btn.classList.add('bg-green-600', 'hover:bg-green-700');
+            // 更新本地存储
+            localStorage.setItem('networkMonitorConfig', JSON.stringify(defaultConfig));
             
-            setTimeout(() => {
-                btn.innerHTML = originalText;
-                btn.classList.remove('bg-green-600', 'hover:bg-green-700');
-                btn.classList.add('bg-gray-600', 'hover:bg-gray-700');
-            }, 2000);
+            // 更新UI
+            updateUIConfig(defaultConfig);
+            
+            // 发送到后端保存
+            try {
+                const response = await fetch(`${API_BASE_URL}/config`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(defaultConfig)
+                });
+                
+                if (response.ok) {
+                    // 显示重置成功的提示
+                    const btn = this;
+                    const originalText = btn.innerHTML;
+                    btn.innerHTML = '<i class="fas fa-check mr-2"></i>已重置';
+                    btn.classList.remove('bg-gray-600', 'hover:bg-gray-700');
+                    btn.classList.add('bg-green-600', 'hover:bg-green-700');
+                    
+                    setTimeout(() => {
+                        btn.innerHTML = originalText;
+                        btn.classList.remove('bg-green-600', 'hover:bg-green-700');
+                        btn.classList.add('bg-gray-600', 'hover:bg-gray-700');
+                    }, 2000);
+                    
+                    // 重新加载配置以确保一切同步
+                    loadConfig();
+                } else {
+                    showToast('重置配置失败', 'error');
+                }
+            } catch (error) {
+                console.error('重置配置时出错:', error);
+                showToast('重置配置出错', 'error');
+            }
         }
     });
 

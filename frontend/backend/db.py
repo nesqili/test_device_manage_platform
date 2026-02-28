@@ -1,12 +1,16 @@
-
 # network_device_monitor/frontend/backend/db.py
 import sqlite3
 import json
+import os
 from datetime import datetime
 
+# Define database path relative to this file
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+DB_PATH = os.path.join(BASE_DIR, 'network_monitor.db')
+
 class DatabaseManager:
-    def __init__(self, db_path='network_monitor.db'):
-        self.db_path = db_path
+    def __init__(self, db_path=None):
+        self.db_path = db_path or DB_PATH
         self._init_db()
     
     def _init_db(self):
@@ -25,9 +29,16 @@ class DatabaseManager:
                 cpu_usage REAL,
                 user TEXT,
                 group_name TEXT,
-                last_check TEXT
+                last_check TEXT,
+                refresh_status TEXT DEFAULT '-'
             )
             ''')
+            
+            # Check if refresh_status column exists (for migration)
+            cursor.execute("PRAGMA table_info(devices)")
+            columns = [info[1] for info in cursor.fetchall()]
+            if 'refresh_status' not in columns:
+                cursor.execute("ALTER TABLE devices ADD COLUMN refresh_status TEXT DEFAULT '-'")
             
             # Create config table
             cursor.execute('''
@@ -78,7 +89,7 @@ class DatabaseManager:
                 ''', (
                     1, 
                     5,
-                    'sed -n \'/^PRETTY_NAME=/{s/^PRETTY_NAME=\\"\\([^"]*\\).*/\\1/p;q}\' /etc/os-release',
+                    'grep PRETTY_NAME /etc/os-release | cut -d= -f2 | tr -d \'"\'',
                     'uptime | awk -F\'up\\\\s*|,\\\\\\\\s*\' \'{d=$2;sub(/ days?/,"",d);h=$3;sub(/:.*/,"",h);print d" 天 "h" 小时"}\'',
                     'df -h / | awk \'NR==2{print $5}\'',
                     'top -bn1 | grep \'Cpu(s)\' | sed \'s/.*, *\\([0-9.]*\\)%* id.*/\\1/\' | awk \'{print 100 - $1}\'',
@@ -128,8 +139,8 @@ class DatabaseManager:
             
             cursor.execute('''
             INSERT OR REPLACE INTO devices (
-                ip, status, version, uptime, disk_usage, cpu_usage, user, group_name, last_check
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                ip, status, version, uptime, disk_usage, cpu_usage, user, group_name, last_check, refresh_status
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             ''', (
                 device_data['ip'],
                 device_data.get('status', 'offline'),
@@ -139,11 +150,24 @@ class DatabaseManager:
                 device_data.get('cpu_usage', 0),
                 device_data.get('user', '未分配'),
                 device_data.get('group', 'NB2'),
-                datetime.now().isoformat()
+                datetime.now().isoformat(),
+                device_data.get('refresh_status', '-')
             ))
             
             conn.commit()
     
+    def update_device_status(self, ip, refresh_status):
+        """
+        Update device refresh status only
+        Args:
+            ip: str - device IP
+            refresh_status: str - new refresh status
+        """
+        with self._get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute('UPDATE devices SET refresh_status = ? WHERE ip = ?', (refresh_status, ip))
+            conn.commit()
+
     def update_device(self, ip, update_data):
         """
         Update device fields
@@ -230,7 +254,7 @@ class DatabaseManager:
             ''', (
                 int(config_data.get('autoRefreshEnabled', True)),
                 config_data.get('refreshInterval', 5),
-                config_data.get('cmdVersion', 'sed -n \'/^PRETTY_NAME=/{s/^PRETTY_NAME=\\"\\([^"]*\\).*/\\1/p;q}\' /etc/os-release'),
+                config_data.get('cmdVersion', 'grep PRETTY_NAME /etc/os-release | cut -d= -f2 | tr -d \'"\''),
                 config_data.get('cmdUptime', 'uptime | awk -F\'up\\\\s*|,\\\\\\\\s*\' \'{d=$2;sub(/ days?/,"",d);h=$3;sub(/:.*/,"",h);print d" 天 "h" 小时"}\''),
                 config_data.get('cmdDisk', 'df -h / | awk \'NR==2{print $5}\''),
                 config_data.get('cmdCpu', 'top -bn1 | grep \'Cpu(s)\' | sed \'s/.*, *\\([0-9.]*\\)%* id.*/\\1/\' | awk \'{print 100 - $1}\''),

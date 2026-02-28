@@ -1,4 +1,3 @@
-
 # network_device_monitor/frontend/backend/tasks.py
 import time
 import threading

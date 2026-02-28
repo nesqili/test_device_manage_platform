@@ -1,4 +1,3 @@
-
 <!-- network_device_monitor/frontend/config.html -->
 <!DOCTYPE html>
 <html lang="zh-CN">
@@ -265,7 +264,7 @@
             <div class="grid grid-cols-1 gap-4">
               <div>
                 <label class="block text-gray-300 text-sm font-medium mb-2" for="cmd-version">系统版本命令</label>
-                <input type="text" id="cmd-version" class="bg-gray-700 border border-gray-600 rounded-lg px-4 py-2 w-full text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent" placeholder="例如: cat /etc/os-release" value="sed -n '/^PRETTY_NAME=/{s/^PRETTY_NAME=\\\"\\([^\"]*\\).*/\\1/p;q}' /etc/os-release">
+                <input type="text" id="cmd-version" class="bg-gray-700 border border-gray-600 rounded-lg px-4 py-2 w-full text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent" placeholder="例如: grep PRETTY_NAME /etc/os-release | cut -d= -f2 | tr -d '&quot;'" value="grep PRETTY_NAME /etc/os-release | cut -d= -f2 | tr -d '&quot;'">
               </div>
               <div>
                 <label class="block text-gray-300 text-sm font-medium mb-2" for="cmd-uptime">在线时长命令</label>

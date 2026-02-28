@@ -124,7 +124,7 @@ def handle_config():
             config_data = {
                 'autoRefreshEnabled': data.get('autoRefreshEnabled', True),
                 'refreshInterval': data.get('refreshInterval', 5),
-                'cmdVersion': data.get('cmdVersion', 'cat /etc/os-release'),
+                'cmdVersion': data.get('cmdVersion', 'grep PRETTY_NAME /etc/os-release | cut -d= -f2 | tr -d \'"\''),
                 'cmdUptime': data.get('cmdUptime', 'uptime'),
                 'cmdDisk': data.get('cmdDisk', 'df -h / | awk \'NR==2{print $5}\''),
                 'cmdCpu': data.get('cmdCpu', 'top -bn1 | grep \'Cpu(s)\' | sed \'s/.*, *\\([0-9.]*\\)%* id.*/\\1/\' | awk \'{print 100 - $1}\''),

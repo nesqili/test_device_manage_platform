@@ -1,8 +1,12 @@
-
 <!-- network_device_monitor/frontend/monitor.js -->
 document.addEventListener('DOMContentLoaded', function() {
-    // API基础URL - 修改为192.168.1.79:5005
-    const API_BASE_URL = 'http://192.168.1.79:5005/api';
+    // API基础URL - 根据当前访问方式自动判断
+    // 如果是file协议访问，使用默认本地IP；如果是http/https访问，使用相对路径/api
+    const API_BASE_URL = window.location.protocol === 'file:' 
+        ? 'http://127.0.0.1:5005/api' 
+        : '/api';
+    
+    console.log('Current API_BASE_URL:', API_BASE_URL);
     
     // 设备数据存储
     let devices = [];
@@ -107,6 +111,18 @@ document.addEventListener('DOMContentLoaded', function() {
             // 格式化更新时间
             const lastCheck = device.last_check ? new Date(device.last_check).toLocaleString() : '-';
             
+            // 刷新状态图标
+            let refreshStatusHtml = '';
+            if (device.refresh_status === 'refreshing') {
+                refreshStatusHtml = '<i class="fas fa-circle-notch fa-spin text-green-500"></i>';
+            } else if (device.refresh_status === 'success') {
+                refreshStatusHtml = '<i class="fas fa-check text-green-500"></i>';
+            } else if (device.refresh_status === 'failed') {
+                refreshStatusHtml = '<i class="fas fa-times text-red-500"></i>';
+            } else {
+                refreshStatusHtml = '<span class="text-gray-400">-</span>';
+            }
+            
             tr.innerHTML = `
                 <td class="px-6 py-4 whitespace-nowrap">${device.ip}</td>
                 <td class="px-6 py-4 whitespace-nowrap">
@@ -115,7 +131,7 @@ document.addEventListener('DOMContentLoaded', function() {
                     </span>
                 </td>
                 <td class="px-6 py-4 whitespace-pre-wrap">${formatVersionInfo(device.version)}</td>
-                <td class="px-6 py-4 whitespace-nowrap">${device.uptime || '-'}</td>
+                <td class="px-6 py-4 whitespace-nowrap max-w-xs truncate">${device.uptime || '-'}</td>
                 <td class="px-6 py-4 whitespace-nowrap">
                     <div class="w-full bg-gray-700 rounded-full h-2.5">
                         <div class="bg-blue-500 h-2.5 rounded-full" style="width: ${diskUsage}%"></div>
@@ -136,6 +152,7 @@ document.addEventListener('DOMContentLoaded', function() {
                         ${getGroupOptions(deviceGroup)}
                     </select>
                 </td>
+                <td class="px-6 py-4 whitespace-nowrap text-center text-lg">${refreshStatusHtml}</td>
                 <td class="px-6 py-4 whitespace-nowrap">${lastCheck}</td>
                 <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                     <button class="text-red-400 hover:text-red-600 delete-device-btn" data-ip="${device.ip}"><i class="fas fa-trash-alt"></i></button>
@@ -284,19 +301,6 @@ document.addEventListener('DOMContentLoaded', function() {
             return;
         }
         
-        // 显示加载状态
-        const tbody = document.getElementById('device-table-body');
-        const loadingRow = document.createElement('tr');
-        loadingRow.innerHTML = `
-            <td colspan="10" class="text-center py-4">
-                <div class="inline-flex items-center">
-                    <i class="fas fa-circle-notch fa-spin mr-2"></i>
-                    正在添加设备 ${ip}...
-                </div>
-            </td>
-        `;
-        tbody.appendChild(loadingRow);
-        
         const newDevice = {
             ip,
             status: 'offline',
@@ -308,34 +312,53 @@ document.addEventListener('DOMContentLoaded', function() {
             group_name: group || 'NB2',
             last_check: new Date().toISOString()
         };
+
+        devices.push(newDevice);
+        renderDeviceTable();
+        setupAutoRefresh();
         
         try {
-            console.log('添加新设备:', newDevice);
+            console.log('添加新设备:', { ip, group: group || 'NB2' });
             const response = await fetch(`${API_BASE_URL}/devices`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json'
                 },
-                body: JSON.stringify(newDevice)
+                body: JSON.stringify({ ip, group: group || 'NB2', user: '未分配' })
             });
             
             if (response.ok) {
-                const savedDevice = await response.json();
-                devices.push(savedDevice);
-                console.log('设备添加成功:', savedDevice);
+                let savedDevice = null;
+                try {
+                    savedDevice = await response.json();
+                } catch (e) {
+                    savedDevice = null;
+                }
+
+                const deviceFromServer = savedDevice && savedDevice.ip ? savedDevice : newDevice;
+                const index = devices.findIndex(d => d.ip === ip);
+                if (index !== -1) {
+                    devices[index] = deviceFromServer;
+                }
+
+                console.log('设备添加成功:', deviceFromServer);
                 renderDeviceTable();
                 setupAutoRefresh();
                 
                 // 立即检查新设备状态
                 console.log('立即检查新设备状态...');
-                checkDeviceStatus(savedDevice);
+                checkDeviceStatus(deviceFromServer);
             } else {
                 console.error('添加设备失败:', response.statusText);
+                devices = devices.filter(d => d.ip !== ip);
                 renderDeviceTable();
+                setupAutoRefresh();
             }
         } catch (error) {
             console.error('添加设备时出错:', error);
+            devices = devices.filter(d => d.ip !== ip);
             renderDeviceTable();
+            setupAutoRefresh();
         }
     }
     
@@ -365,6 +388,8 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     }
     
+    let pollingInterval = null;
+
     // 检查所有设备状态
     async function checkAllDevicesStatus() {
         try {
@@ -374,10 +399,31 @@ document.addEventListener('DOMContentLoaded', function() {
             });
             
             if (response.ok) {
-                devices = await response.json();
-                console.log('所有设备状态更新:', devices);
-                renderDeviceTable();
-                document.getElementById('last-update').textContent = new Date().toLocaleString();
+                console.log('刷新请求已发送，开始轮询状态...');
+                
+                // 立即刷新一次列表显示"正在刷新"状态
+                await initDeviceList();
+                
+                // Start polling
+                if (pollingInterval) clearInterval(pollingInterval);
+                
+                // Poll every 1 second
+                let attempts = 0;
+                pollingInterval = setInterval(async () => {
+                    attempts++;
+                    await initDeviceList();
+                    
+                    // Check if any device is still refreshing
+                    const anyRefreshing = devices.some(d => d.refresh_status === 'refreshing');
+                    
+                    // Stop if no devices are refreshing or timeout (2 minutes)
+                    if (!anyRefreshing || attempts > 120) {
+                        clearInterval(pollingInterval);
+                        pollingInterval = null;
+                        console.log('刷新轮询结束');
+                        document.getElementById('last-update').textContent = new Date().toLocaleString();
+                    }
+                }, 1000);
             } else {
                 console.error('刷新所有设备状态失败:', response.statusText);
             }

@@ -146,6 +146,7 @@
                 <th class="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">CPU占用</th>
                 <th class="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">使用者</th>
                 <th class="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">分组</th>
+                <th class="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">刷新状态</th>
                 <th class="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">更新时间</th>
                 <th class="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">操作</th>
               </tr>
@@ -193,59 +194,27 @@
   <script src="https://cdnjs.cloudflare.com/ajax/libs/particles.js/2.0.0/particles.min.js"></script>
   <script src="monitor.js"></script>
   <script>
-    // 粒子效果初始化
-    document.addEventListener('DOMContentLoaded', function() {
-      particlesJS('particles-js', {
-        particles: {
-          number: { value: 80, density: { enable: true, value_area: 800 } },
-          color: { value: "#3b82f6" },
-          shape: { type: "circle" },
-          opacity: { value: 0.5, random: true },
-          size: { value: 3, random: true },
-          line_linked: { enable: true, distance: 150, color: "#3b82f6", opacity: 0.4, width: 1 },
-          move: { enable: true, speed: 2, direction: "none", random: true, straight: false, out_mode: "out" }
-        },
-        interactivity: {
-          detect_on: "canvas",
-          events: {
-            onhover: { enable: true, mode: "repulse" },
-            onclick: { enable: true, mode: "push" }
+      // 粒子效果初始化
+      document.addEventListener('DOMContentLoaded', function() {
+        particlesJS('particles-js', {
+          particles: {
+            number: { value: 80, density: { enable: true, value_area: 800 } },
+            color: { value: "#3b82f6" },
+            shape: { type: "circle" },
+            opacity: { value: 0.5, random: true },
+            size: { value: 3, random: true },
+            line_linked: { enable: true, distance: 150, color: "#3b82f6", opacity: 0.4, width: 1 },
+            move: { enable: true, speed: 2, direction: "none", random: true, straight: false, out_mode: "out" }
+          },
+          interactivity: {
+            detect_on: "canvas",
+            events: {
+              onhover: { enable: true, mode: "repulse" },
+              onclick: { enable: true, mode: "push" }
+            }
           }
-        }
+        });
       });
-
-      // 初始化加载设备列表
-      refreshDeviceList();
-      
-      // 绑定添加设备按钮
-      document.getElementById('add-device-btn').addEventListener('click', function() {
-        document.getElementById('add-device-modal').classList.remove('hidden');
-        document.getElementById('device-ip').value = '';
-        document.getElementById('device-group').value = 'NB2';
-      });
-      
-      // 绑定取消添加设备按钮
-      document.getElementById('cancel-add-device').addEventListener('click', function() {
-        document.getElementById('add-device-modal').classList.add('hidden');
-      });
-      
-      // 绑定确认添加设备按钮
-      document.getElementById('confirm-add-device').addEventListener('click', function() {
-        const ip = document.getElementById('device-ip').value.trim();
-        const group = document.getElementById('device-group').value;
-        
-        if (ip) {
-          document.getElementById('confirm-text').classList.add('hidden');
-          document.getElementById('loading-spinner').classList.remove('hidden');
-          
-          addDevice(ip, group).finally(() => {
-            document.getElementById('confirm-text').classList.remove('hidden');
-            document.getElementById('loading-spinner').classList.add('hidden');
-            document.getElementById('add-device-modal').classList.add('hidden');
-          });
-        }
-      });
-    });
   </script>
 </body>
 </html>

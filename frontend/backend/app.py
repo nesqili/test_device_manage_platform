@@ -1,6 +1,5 @@
-
 # network_device_monitor/frontend/backend/app.py
-from flask import Flask, request, jsonify
+from flask import Flask, request, jsonify, send_from_directory
 from flask_cors import CORS
 import sqlite3
 import threading
@@ -9,8 +8,9 @@ from datetime import datetime
 import paramiko
 import json
 import os
+import socket
 
-app = Flask(__name__)
+app = Flask(__name__, static_folder='../')
 CORS(app)
 
 # API路由前缀
@@ -20,6 +20,10 @@ API_PREFIX = '/api'
 # DATABASE = 'network_monitor.db'
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 DATABASE = os.path.join(BASE_DIR, 'network_monitor.db')
+
+DEFAULT_CMD_UPTIME = "awk '{t=int($1);d=int(t/86400);h=int((t%86400)/3600);printf \"%d天%02d小时\",d,h}' /proc/uptime"
+OLD_DEFAULT_CMD_UPTIME_PERL = 'uptime | perl -pe \'s/.*up\\s+(?:(\\d+)\\s+days?,\\s+)?(\\d+):.*/($1?$1:0)."天$2小时"/e\''
+OLD_DEFAULT_CMD_UPTIME_AWK = 'uptime | awk -F\'up\\\\s*|,\\\\\\\\s*\' \'{d=$2;sub(/ days?/,"",d);h=$3;sub(/:.*/,"",h);print d" 天 "h" 小时"}\''
 
 def init_db():
     """初始化数据库表结构"""
@@ -85,13 +89,26 @@ def init_db():
             ''', (
                 1, 
                 5,
-                'sed -n \'/^PRETTY_NAME=/{s/^PRETTY_NAME=\\"\\([^\\"]*\\).*/\\1/p;q}\' /etc/os-release',
-                'uptime | perl -pe \'s/.*up\\s+(?:(\\d+)\\s+days?,\\s+)?(\\d+):.*/($1?$1:0)."天$2小时"/e\'',
+                'grep PRETTY_NAME /etc/os-release | cut -d= -f2 | tr -d \'"\'',
+                DEFAULT_CMD_UPTIME,
                 'df -h / | awk \'NR==2{print $5}\'',
                 'top -bn1 | grep \'Cpu(s)\' | sed \'s/.*, *\\([0-9.]*\\)%* id.*/\\1/\' | awk \'{print 100 - $1}\'',
                 json.dumps(default_groups)
             ))
+
+        cursor.execute('SELECT cmd_uptime FROM config WHERE id = 1')
+        row = cursor.fetchone()
+        # 仅当检测到已知的旧版或无效命令时才强制更新，允许用户自定义其他命令
+        if row and row[0] in (OLD_DEFAULT_CMD_UPTIME_PERL, OLD_DEFAULT_CMD_UPTIME_AWK, 'uptime'):
+            print(f"检测到旧的 uptime 命令: {row[0]}，正在更新为默认推荐命令")
+            cursor.execute('UPDATE config SET cmd_uptime = ? WHERE id = 1', (DEFAULT_CMD_UPTIME,))
         
+        # Check if refresh_status column exists
+        cursor.execute("PRAGMA table_info(devices)")
+        columns = [column[1] for column in cursor.fetchall()]
+        if 'refresh_status' not in columns:
+            cursor.execute('ALTER TABLE devices ADD COLUMN refresh_status TEXT DEFAULT "-"')
+
         conn.commit()
         conn.close()
 
@@ -142,6 +159,10 @@ def check_device_status(ip, group_name=None):
         conn = get_db_connection()
         cursor = conn.cursor()
         
+        # Set status to refreshing
+        cursor.execute("UPDATE devices SET refresh_status = 'refreshing' WHERE ip = ?", (ip,))
+        conn.commit()
+        
         # 获取分组SSH配置
         ssh_config = get_ssh_config_for_group(group_name or 'NB2')
         if not ssh_config:
@@ -191,6 +212,7 @@ def check_device_status(ip, group_name=None):
             cpu_usage = '0'
             
             try:
+                print(f"执行版本命令: {config['cmd_version']}")
                 stdin, stdout, stderr = ssh.exec_command(config['cmd_version'])
                 version = stdout.read().decode().strip() or '-'
                 print(f"系统版本: {version}")
@@ -198,6 +220,7 @@ def check_device_status(ip, group_name=None):
                 print(f"获取版本信息失败: {str(e)}")
             
             try:
+                print(f"执行uptime命令: {config['cmd_uptime']}")
                 stdin, stdout, stderr = ssh.exec_command(config['cmd_uptime'])
                 uptime = stdout.read().decode().strip() or '-'
                 print(f"在线时长: {uptime}")
@@ -205,6 +228,7 @@ def check_device_status(ip, group_name=None):
                 print(f"获取在线时长失败: {str(e)}")
             
             try:
+                print(f"执行磁盘命令: {config['cmd_disk']}")
                 stdin, stdout, stderr = ssh.exec_command(config['cmd_disk'])
                 disk_usage = stdout.read().decode().strip().replace('%', '') or '0'
                 print(f"磁盘占用: {disk_usage}%")
@@ -212,6 +236,7 @@ def check_device_status(ip, group_name=None):
                 print(f"获取磁盘占用失败: {str(e)}")
             
             try:
+                print(f"执行CPU命令: {config['cmd_cpu']}")
                 stdin, stdout, stderr = ssh.exec_command(config['cmd_cpu'])
                 cpu_usage = stdout.read().decode().strip() or '0'
                 print(f"CPU占用: {cpu_usage}%")
@@ -228,7 +253,8 @@ def check_device_status(ip, group_name=None):
                 uptime = ?,
                 disk_usage = ?,
                 cpu_usage = ?,
-                last_check = ?
+                last_check = ?,
+                refresh_status = 'success'
             WHERE ip = ?
             ''', (
                 'online',
@@ -252,7 +278,8 @@ def check_device_status(ip, group_name=None):
         cursor.execute('''
         UPDATE devices SET 
             status = ?,
-            last_check = ?
+            last_check = ?,
+            refresh_status = 'failed'
         WHERE ip = ?
         ''', (
             'offline',
@@ -348,8 +375,8 @@ def handle_config():
             ''', (
                 int(data.get('autoRefreshEnabled', True)),
                 data.get('refreshInterval', 5),
-                data.get('cmdVersion', 'sed -n \'/^PRETTY_NAME=/{s/^PRETTY_NAME=\\"\\([^\\"]*\\).*/\\1/p;q}\' /etc/os-release'),
-                data.get('cmdUptime', 'uptime | perl -pe \'s/.*up\\s+(?:(\\d+)\\s+days?,\\s+)?(\\d+):.*/($1?$1:0)."天$2小时"/e\''),
+                data.get('cmdVersion', 'grep PRETTY_NAME /etc/os-release | cut -d= -f2 | tr -d \'"\''),
+                data.get('cmdUptime', DEFAULT_CMD_UPTIME),
                 data.get('cmdDisk', 'df -h / | awk \'NR==2{print $5}\''),
                 data.get('cmdCpu', 'top -bn1 | grep \'Cpu(s)\' | sed \'s/.*, *\\([0-9.]*\\)%* id.*/\\1/\' | awk \'{print 100 - $1}\''),
                 json.dumps(data.get('deviceGroups', []))
@@ -382,6 +409,9 @@ def handle_devices():
             conn = get_db_connection()
             cursor = conn.cursor()
             
+            group = data.get('group') or data.get('group_name') or 'NB2'
+            user = data.get('user', '未分配')
+
             cursor.execute('''
             INSERT OR REPLACE INTO devices (
                 ip, status, version, uptime, disk_usage, cpu_usage, user, group_name, last_check
@@ -393,17 +423,33 @@ def handle_devices():
                 '-',
                 0,
                 0,
-                data.get('user', '未分配'),
-                data.get('group', 'NB2'),
+                user,
+                group,
                 datetime.now().isoformat()
             ))
             
             conn.commit()
+
+            cursor.execute('SELECT * FROM devices WHERE ip = ?', (data['ip'],))
+            device = cursor.fetchone()
             
             # 立即检查新设备状态
-            threading.Thread(target=check_device_status, args=(data['ip'], data.get('group', 'NB2'))).start()
+            threading.Thread(target=check_device_status, args=(data['ip'], group)).start()
             
-            return jsonify({'success': True})
+            if device:
+                return jsonify(dict(device))
+
+            return jsonify({
+                'ip': data['ip'],
+                'status': 'offline',
+                'version': '-',
+                'uptime': '-',
+                'disk_usage': 0,
+                'cpu_usage': 0,
+                'user': user,
+                'group_name': group,
+                'last_check': datetime.now().isoformat()
+            })
         except Exception as e:
             return jsonify({'success': False, 'error': str(e)})
         finally:
@@ -462,26 +508,46 @@ def handle_device(ip):
         finally:
             conn.close()
 
-@app.route(f'{API_PREFIX}/devices/check-all', methods=['POST'])
-def check_all_devices():
+def run_check_all_devices():
+    """Execute check all devices with priority"""
     try:
         conn = get_db_connection()
         cursor = conn.cursor()
         
-        cursor.execute('SELECT ip, group_name FROM devices')
-        devices = cursor.fetchall()
+        # Set all to refreshing initially
+        cursor.execute("UPDATE devices SET refresh_status = 'refreshing'")
+        conn.commit()
+        
+        cursor.execute('SELECT * FROM devices')
+        devices = [dict(row) for row in cursor.fetchall()]
+        conn.close()
+        
+        # Priority sorting
+        def priority_key(d):
+            # 1. Online Non-Server
+            # 2. Online Server
+            # 3. Offline Server
+            # 4. Offline Device
+            is_online = d.get('status') == 'online'
+            is_server = d.get('group_name') == '服务器'
+            
+            if is_online and not is_server: return 0
+            if is_online and is_server: return 1
+            if not is_online and is_server: return 2
+            return 3
+            
+        devices.sort(key=priority_key)
         
         for device in devices:
             check_device_status(device['ip'], device['group_name'])
-        
-        cursor.execute('SELECT * FROM devices')
-        updated_devices = [dict(row) for row in cursor.fetchall()]
-        
-        return jsonify(updated_devices)
+            
     except Exception as e:
-        return jsonify({'success': False, 'error': str(e)})
-    finally:
-        conn.close()
+        print(f"Error in run_check_all_devices: {e}")
+
+@app.route(f'{API_PREFIX}/devices/check-all', methods=['POST'])
+def check_all_devices():
+    threading.Thread(target=run_check_all_devices).start()
+    return jsonify({'success': True, 'message': 'Refresh started'})
 
 @app.route(f'{API_PREFIX}/devices/<ip>/check', methods=['POST'])
 def check_single_device(ip):
@@ -504,5 +570,30 @@ def check_single_device(ip):
     finally:
         conn.close()
 
+@app.route('/')
+def serve_index():
+    return send_from_directory(app.static_folder, 'index.html')
+
+@app.route('/config')
+def serve_config():
+    return send_from_directory(app.static_folder, 'config.html')
+
+@app.route('/<path:filename>')
+def serve_static(filename):
+    return send_from_directory(app.static_folder, filename)
+
+def get_local_ip():
+    s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+    try:
+        s.connect(('8.8.8.8', 80))
+        return s.getsockname()[0]
+    except Exception:
+        return '127.0.0.1'
+    finally:
+        s.close()
+
 if __name__ == '__main__':
-    app.run(debug=True, host='192.168.1.79', port=5005)
+    host = os.environ.get('HOST') or '0.0.0.0'
+    port = int(os.environ.get('PORT') or 5005)
+    print(f"API服务启动: http://{get_local_ip()}:{port}")
+    app.run(debug=True, host=host, port=port)
